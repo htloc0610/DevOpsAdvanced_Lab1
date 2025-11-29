@@ -1,0 +1,105 @@
+version: 2
+
+sources:
+  - name: adventureworks
+    description: AdventureWorks Sales schema source tables
+    database: AdventureWorks2014
+    schema: Sales
+    freshness:
+      warn_after: {count: 24, period: hour}
+      error_after: {count: 48, period: hour}
+    loaded_at_field: ModifiedDate
+    tables:
+      - name: SalesOrderHeader
+        description: Contains the sales order header information including order dates, customer, and status
+        identifier: SalesOrderHeader
+        columns:
+          - name: SalesOrderID
+            description: Primary key for sales orders
+          - name: OrderDate
+            description: Date when the order was placed
+          - name: CustomerID
+            description: Foreign key to customer table
+          - name: Status
+            description: Order status code
+      - name: SalesOrderDetail
+        description: Contains the sales order detail line items with products, quantities, and prices
+        identifier: SalesOrderDetail
+        columns:
+          - name: SalesOrderDetailID
+            description: Primary key for order details
+          - name: SalesOrderID
+            description: Foreign key to sales order header
+          - name: ProductID
+            description: Foreign key to product table
+          - name: OrderQty
+            description: Quantity ordered
+          - name: UnitPrice
+            description: Unit price of the product
+      - name: Customer
+        description: Contains customer information and links to person data
+        identifier: Customer
+        columns:
+          - name: CustomerID
+            description: Primary key for customers
+          - name: PersonID
+            description: Foreign key to person table
+          - name: TerritoryID
+            description: Sales territory identifier
+
+  - name: adventureworks_production
+    description: AdventureWorks Production schema source tables
+    database: AdventureWorks2014
+    schema: Production
+    freshness:
+      warn_after: {count: 24, period: hour}
+      error_after: {count: 48, period: hour}
+    loaded_at_field: ModifiedDate
+    tables:
+      - name: Product
+        description: Contains product information including pricing, inventory, and categorization
+        identifier: Product
+        columns:
+          - name: ProductID
+            description: Primary key for products
+          - name: Name
+            description: Product name
+          - name: ProductNumber
+            description: Unique product number
+          - name: ListPrice
+            description: Product list price
+          - name: ProductSubcategoryID
+            description: Foreign key to product subcategory
+      - name: ProductSubcategory
+        description: Contains product subcategory information
+        identifier: ProductSubcategory
+        columns:
+          - name: ProductSubcategoryID
+            description: Primary key for subcategories
+          - name: Name
+            description: Subcategory name
+          - name: ProductCategoryID
+            description: Foreign key to product category
+
+  - name: adventureworks_person
+    description: AdventureWorks Person schema source tables
+    database: AdventureWorks2014
+    schema: Person
+    freshness:
+      warn_after: {count: 24, period: hour}
+      error_after: {count: 48, period: hour}
+    loaded_at_field: ModifiedDate
+    tables:
+      - name: Person
+        description: Contains person information including names and contact preferences
+        identifier: Person
+        columns:
+          - name: BusinessEntityID
+            description: Primary key for persons
+          - name: FirstName
+            description: Person's first name
+          - name: LastName
+            description: Person's last name
+          - name: EmailPromotion
+            description: Email promotion preference
+
