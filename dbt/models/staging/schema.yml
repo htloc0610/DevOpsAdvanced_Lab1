@@ -1,0 +1,224 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Staging model for customer data. Extracts and cleans customer and person information from AdventureWorks sources."
+    columns:
+      - name: customer_id
+        description: "Primary key - Unique identifier for each customer"
+        tests:
+          - not_null
+          - unique
+      - name: person_id
+        description: "Foreign key - Reference to Person table"
+        tests:
+          - not_null
+      - name: account_number
+        description: "Unique account number for the customer (normalized to uppercase)"
+        tests:
+          - not_null
+          - unique
+      - name: store_id
+        description: "ID of the store associated with the customer (if applicable)"
+      - name: territory_id
+        description: "Sales territory ID where the customer is located"
+      - name: first_name
+        description: "Customer's first name (trimmed and cleaned)"
+      - name: last_name
+        description: "Customer's last name (trimmed and cleaned)"
+      - name: middle_name
+        description: "Customer's middle name (trimmed and cleaned)"
+      - name: email_promotion
+        description: "Flag indicating email promotion preferences (0-2)"
+      - name: modified_date
+        description: "Timestamp of last modification"
+      - name: row_guid
+        description: "Row globally unique identifier"
+
+  - name: stg_products
+    description: "Staging model for product data. Extracts and cleans product information including subcategory details."
+    columns:
+      - name: product_id
+        description: "Primary key - Unique identifier for each product"
+        tests:
+          - not_null
+          - unique
+      - name: product_subcategory_id
+        description: "Foreign key - Reference to product subcategory"
+      - name: product_model_id
+        description: "Foreign key - Reference to product model"
+      - name: product_number
+        description: "Unique product number (normalized to uppercase)"
+        tests:
+          - not_null
+          - unique
+      - name: product_name
+        description: "Product name (trimmed)"
+        tests:
+          - not_null
+      - name: make_flag
+        description: "Flag indicating if product is manufactured in-house (1) or purchased (0)"
+      - name: finished_goods_flag
+        description: "Flag indicating if product is a finished good (1) or component (0)"
+      - name: color
+        description: "Product color (defaults to 'Unknown' if null)"
+      - name: size
+        description: "Product size"
+      - name: size_unit_measure_code
+        description: "Unit of measure code for size"
+      - name: weight_unit_measure_code
+        description: "Unit of measure code for weight"
+      - name: weight
+        description: "Product weight"
+      - name: product_line
+        description: "Product line classification (R, M, T, S)"
+      - name: product_class
+        description: "Product class (H, M, L)"
+      - name: product_style
+        description: "Product style (U, M, W)"
+      - name: safety_stock_level
+        description: "Minimum inventory quantity"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: reorder_point
+        description: "Inventory level that triggers reordering"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: days_to_manufacture
+        description: "Number of days required to manufacture the product"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: standard_cost
+        description: "Standard cost of the product"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: list_price
+        description: "Selling price of the product"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: sell_start_date
+        description: "Date when product became available for sale"
+        tests:
+          - not_null
+      - name: sell_end_date
+        description: "Date when product was discontinued (null if still active)"
+      - name: discontinued_date
+        description: "Date when product was discontinued"
+      - name: subcategory_name
+        description: "Name of the product subcategory"
+      - name: product_category_id
+        description: "Foreign key - Reference to product category"
+      - name: modified_date
+        description: "Timestamp of last modification"
+      - name: row_guid
+        description: "Row globally unique identifier"
+
+  - name: stg_sales_orders
+    description: "Staging model for sales orders. Combines sales order header and detail information with basic cleaning."
+    columns:
+      - name: sales_order_id
+        description: "Primary key - Unique identifier for each sales order"
+        tests:
+          - not_null
+      - name: sales_order_detail_id
+        description: "Primary key - Unique identifier for each order line item"
+        tests:
+          - not_null
+      - name: order_date
+        description: "Date when the order was placed"
+        tests:
+          - not_null
+      - name: due_date
+        description: "Date when the order is due"
+        tests:
+          - not_null
+      - name: ship_date
+        description: "Date when the order was shipped"
+      - name: order_status
+        description: "Order status code (1=In process, 2=Approved, 3=Backordered, 4=Rejected, 5=Shipped, 6=Cancelled)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 6
+      - name: is_online_order
+        description: "Flag indicating if order was placed online (1) or offline (0)"
+      - name: sales_order_number
+        description: "Unique sales order number (normalized to uppercase)"
+        tests:
+          - not_null
+      - name: purchase_order_number
+        description: "Customer purchase order number"
+      - name: account_number
+        description: "Customer account number"
+      - name: customer_id
+        description: "Foreign key - Reference to customer"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: sales_person_id
+        description: "ID of the sales person (0 if no sales person assigned)"
+      - name: territory_id
+        description: "Sales territory ID"
+      - name: ship_to_address_id
+        description: "Shipping address ID"
+      - name: bill_to_address_id
+        description: "Billing address ID"
+      - name: ship_method_id
+        description: "Foreign key - Reference to shipping method"
+      - name: product_id
+        description: "Foreign key - Reference to product"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
+      - name: order_quantity
+        description: "Quantity ordered"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 1
+      - name: unit_price
+        description: "Unit price of the product"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: unit_price_discount
+        description: "Discount percentage applied to unit price"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1
+      - name: line_total
+        description: "Total amount for this line item (from source)"
+      - name: calculated_line_total
+        description: "Calculated line total (quantity * unit_price * (1 - discount))"
+      - name: order_subtotal
+        description: "Order subtotal before tax and freight"
+      - name: order_tax_amount
+        description: "Tax amount for the order"
+      - name: order_freight
+        description: "Freight cost for the order"
+      - name: order_total_due
+        description: "Total amount due for the order"
+      - name: header_modified_date
+        description: "Timestamp of last modification to order header"
+      - name: detail_modified_date
+        description: "Timestamp of last modification to order detail"
+      - name: header_row_guid
+        description: "Row globally unique identifier for order header"
+

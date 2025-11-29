@@ -18,12 +18,12 @@ clean-targets:
 
 models:
   dbt_sqlserver_project:
-    bronze:
+    staging:
       +materialized: view
-      +schema: bronze
-    silver:
+      +schema: staging
+    intermediate:
       +materialized: table
-      +schema: silver
-    gold:
-      +materialized: table 
-      +schema: gold
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
