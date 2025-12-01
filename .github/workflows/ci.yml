@@ -266,7 +266,7 @@ jobs:
           cd dbt
           dbt docs generate --profiles-dir . || exit 1
 
-      - name: Verify generated files
+      - name: Verify documentation files
         run: |
           cd dbt
           echo "Checking generated files:"
@@ -276,22 +276,17 @@ jobs:
             exit 1
           fi
           echo "manifest.json exists ($(wc -c < target/manifest.json) bytes)"
-
-      - name: Verify documentation files
-        run: |
-          cd dbt
-          if [ ! -f target/manifest.json ]; then
-            echo "::error::manifest.json not found"
-            exit 1
-          fi
-          if [ ! -f target/catalog.json ]; then
-            echo "::warning::catalog.json not found - docs may be incomplete"
-          fi
           if [ ! -f target/index.html ]; then
             echo "::error::index.html not found"
             exit 1
           fi
-          echo "Documentation files verified"
+          echo "index.html exists"
+          if [ ! -f target/catalog.json ]; then
+            echo "::warning::catalog.json not found - docs may be incomplete"
+          else
+            echo "catalog.json exists ($(wc -c < target/catalog.json) bytes)"
+          fi
+          echo "All required documentation files verified"
 
       - name: Upload documentation
         if: always()
