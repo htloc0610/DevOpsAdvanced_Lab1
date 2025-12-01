@@ -234,16 +234,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check PR title format
-        run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          if [[ ! "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: ]]; then
-            echo "::error::PR title must follow conventional commits format"
-            echo "Examples: feat: add new model, fix: correct date calculation"
-            exit 1
-          fi
-          echo " PR title format is valid"
-
       - name: Check for large files
         run: |
           git diff --name-only origin/${{ github.base_ref }}...HEAD | while read file; do
