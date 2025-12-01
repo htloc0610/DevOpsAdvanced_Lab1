@@ -119,14 +119,6 @@ jobs:
                 user: ${{ secrets.DBT_USER }}
                 password: ${{ secrets.DBT_PASSWORD }}
           EOF
-
-      - name: Verify profiles.yml
-        run: |
-          echo "Checking profiles.yml structure:"
-          echo "---"
-          cat dbt/profiles.yml
-          echo "---"
-          echo "Profile file exists: $(test -f dbt/profiles.yml && echo 'YES' || echo 'NO')"
   
       - name: Install DBT dependencies
         run: |
@@ -197,14 +189,6 @@ jobs:
                 user: ${{ secrets.DBT_USER }}
                 password: ${{ secrets.DBT_PASSWORD }}
           EOF
-
-      - name: Verify profiles.yml
-        run: |
-          echo "Checking profiles.yml structure:"
-          echo "---"
-          cat dbt/profiles.yml
-          echo "---"
-          echo "Profile file exists: $(test -f dbt/profiles.yml && echo 'YES' || echo 'NO')"
 
       - name: Download compiled artifacts
         uses: actions/download-artifact@v4
@@ -347,14 +331,6 @@ jobs:
                 user: ${{ secrets.DBT_USER }}
                 password: ${{ secrets.DBT_PASSWORD }}
           EOF
-
-      - name: Verify profiles.yml
-        run: |
-          echo "Checking profiles.yml structure:"
-          echo "---"
-          cat dbt/profiles.yml
-          echo "---"
-          echo "Profile file exists: $(test -f dbt/profiles.yml && echo 'YES' || echo 'NO')"
 
       - name: Download compiled artifacts
         uses: actions/download-artifact@v4
