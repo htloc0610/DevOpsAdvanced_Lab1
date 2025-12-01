@@ -119,7 +119,8 @@ jobs:
                 user: ${{ secrets.DBT_USER }}
                 password: ${{ secrets.DBT_PASSWORD }}
           EOF
-
+          cat dbt/profiles.yml
+  
       - name: Install DBT dependencies
         run: |
           cd dbt
