@@ -256,6 +256,11 @@ jobs:
           cd dbt
           dbt deps --profiles-dir .
 
+      - name: Compile DBT models (for docs)
+        run: |
+          cd dbt
+          dbt compile --profiles-dir . || true
+
       - name: Generate DBT documentation
         run: |
           cd dbt
