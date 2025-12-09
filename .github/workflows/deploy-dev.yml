@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Ensure Docker services are running
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Checking Docker services status..."
           docker-compose ps
@@ -41,14 +41,14 @@ jobs:
           }
 
       - name: Validate DBT project
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Validating DBT project..."
           docker-compose exec -T dbt dbt debug
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Check DBT dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Installing DBT dependencies..."
           docker-compose exec -T dbt dbt deps
@@ -69,7 +69,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Ensure Docker services are running
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Checking Docker services status..."
           docker-compose ps
@@ -83,14 +83,14 @@ jobs:
           }
 
       - name: Install DBT dependencies
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Installing DBT dependencies..."
           docker-compose exec -T dbt dbt deps
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Compile DBT models
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Compiling DBT models..."
           docker-compose exec -T dbt dbt compile --target ${{ env.TARGET }}
@@ -98,7 +98,7 @@ jobs:
 
       - name: Run DBT transformations
         id: dbt_run
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Running DBT transformations..."
           docker-compose exec -T dbt dbt run --target ${{ env.TARGET }}
@@ -106,7 +106,7 @@ jobs:
 
       - name: Run data quality tests
         if: ${{ !inputs.skip_tests }}
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Running DBT tests..."
           docker-compose exec -T dbt dbt test --target ${{ env.TARGET }}
@@ -114,13 +114,13 @@ jobs:
 
       - name: Check source freshness
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Checking source freshness..."
           docker-compose exec -T dbt dbt source freshness --target ${{ env.TARGET }}
 
       - name: Generate DBT documentation
-        shell: pwsh
+        shell: powershell
         continue-on-error: true
         run: |
           Write-Host "Generating DBT documentation..."
@@ -138,7 +138,7 @@ jobs:
 
       - name: Create deployment summary
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           $summary = @"
           ## Deployment to Development Environment
@@ -174,7 +174,7 @@ jobs:
 
       - name: Run health checks
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Running post-deployment health checks..."
           
@@ -188,7 +188,7 @@ jobs:
 
       - name: Check data freshness
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Checking data freshness..."
           docker-compose exec -T dbt dbt source freshness --target ${{ env.TARGET }}
@@ -206,7 +206,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Send deployment notification
-        shell: pwsh
+        shell: powershell
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
