@@ -12,8 +12,6 @@ on:
         default: false
 
 env:
-  DBT_PROFILES_DIR: ./dbt
-  PYTHON_VERSION: '3.9'
   ENVIRONMENT: dev
   TARGET: dev
 
@@ -21,95 +19,112 @@ jobs:
   # Pre-deployment validation
   pre-deployment-check:
     name: Pre-deployment Validation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 10
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install DBT SQLServer adapter
+      - name: Ensure Docker services are running
+        shell: pwsh
         run: |
-          pip install dbt-sqlserver
+          Write-Host "Checking Docker services status..."
+          docker-compose ps
+          
+          # Ensure containers are running
+          $containers = docker-compose ps -q
+          if (-not $containers) {
+            Write-Host "Starting Docker services..."
+            docker-compose up -d
+            Start-Sleep -Seconds 60
+          }
 
       - name: Validate DBT project
+        shell: pwsh
         run: |
-          cd dbt
-          dbt debug --profiles-dir . --target ${{ env.TARGET }} || exit 1
+          Write-Host "Validating DBT project..."
+          docker-compose exec -T dbt dbt debug
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Check DBT dependencies
+        shell: pwsh
         run: |
-          cd dbt
-          dbt deps --profiles-dir . || exit 1
+          Write-Host "Installing DBT dependencies..."
+          docker-compose exec -T dbt dbt deps
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
   # Deploy to Development
   deploy-dev:
     name: Deploy to Development Environment
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 30
     needs: pre-deployment-check
     environment:
       name: development
-      url: https://dev.example.com  # Update with your dev environment URL
+      url: https://dev.example.com
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
+      - name: Ensure Docker services are running
+        shell: pwsh
         run: |
-          pip install dbt-sqlserver pyodbc
-
-      - name: Configure database connection
-        env:
-          DEV_SQL_SERVER: ${{ secrets.DEV_SQL_SERVER }}
-          DEV_SQL_USER: ${{ secrets.DEV_SQL_USER }}
-          DEV_SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
-        run: |
-          echo "Database connection configured for ${{ env.ENVIRONMENT }} environment"
+          Write-Host "Checking Docker services status..."
+          docker-compose ps
+          
+          # Ensure containers are running
+          $containers = docker-compose ps -q
+          if (-not $containers) {
+            Write-Host "Starting Docker services..."
+            docker-compose up -d
+            Start-Sleep -Seconds 60
+          }
 
       - name: Install DBT dependencies
+        shell: pwsh
         run: |
-          cd dbt
-          dbt deps --profiles-dir . --target ${{ env.TARGET }}
+          Write-Host "Installing DBT dependencies..."
+          docker-compose exec -T dbt dbt deps
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Compile DBT models
+        shell: pwsh
         run: |
-          cd dbt
-          dbt compile --profiles-dir . --target ${{ env.TARGET }} || exit 1
+          Write-Host "Compiling DBT models..."
+          docker-compose exec -T dbt dbt compile --target ${{ env.TARGET }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Run DBT transformations
         id: dbt_run
+        shell: pwsh
         run: |
-          cd dbt
-          dbt run --profiles-dir . --target ${{ env.TARGET }} || exit 1
+          Write-Host "Running DBT transformations..."
+          docker-compose exec -T dbt dbt run --target ${{ env.TARGET }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Run data quality tests
         if: ${{ !inputs.skip_tests }}
+        shell: pwsh
         run: |
-          cd dbt
-          dbt test --profiles-dir . --target ${{ env.TARGET }} || exit 1
+          Write-Host "Running DBT tests..."
+          docker-compose exec -T dbt dbt test --target ${{ env.TARGET }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Check source freshness
         continue-on-error: true
+        shell: pwsh
         run: |
-          cd dbt
-          dbt source freshness --profiles-dir . --target ${{ env.TARGET }} || true
+          Write-Host "Checking source freshness..."
+          docker-compose exec -T dbt dbt source freshness --target ${{ env.TARGET }}
 
       - name: Generate DBT documentation
+        shell: pwsh
+        continue-on-error: true
         run: |
-          cd dbt
-          dbt docs generate --profiles-dir . --target ${{ env.TARGET }} || true
+          Write-Host "Generating DBT documentation..."
+          docker-compose exec -T dbt dbt docs generate --target ${{ env.TARGET }}
 
       - name: Upload deployment artifacts
         if: always()
@@ -123,27 +138,32 @@ jobs:
 
       - name: Create deployment summary
         if: always()
+        shell: pwsh
         run: |
-          echo "## Deployment to Development Environment" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Target:** ${{ env.TARGET }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          $summary = @"
+          ## Deployment to Development Environment
           
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "**Deployment Successful**" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "**Deployment Failed**" >> $GITHUB_STEP_SUMMARY
-          fi
+          **Status:** ${{ job.status }}
+          **Environment:** ${{ env.ENVIRONMENT }}
+          **Target:** ${{ env.TARGET }}
+          **Deployed by:** ${{ github.actor }}
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          
+          "@
+          
+          if ("${{ job.status }}" -eq "success") {
+            $summary += "**Deployment Successful**"
+          } else {
+            $summary += "**Deployment Failed**"
+          }
+          
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
   # Post-deployment health checks
   post-deployment-health-check:
     name: Post-deployment Health Checks
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 15
     needs: deploy-dev
     if: success()
@@ -152,37 +172,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install pyodbc
-
-      - name: Run row count checks
+      - name: Run health checks
         continue-on-error: true
-        env:
-          DEV_SQL_SERVER: ${{ secrets.DEV_SQL_SERVER }}
-          DEV_SQL_USER: ${{ secrets.DEV_SQL_USER }}
-          DEV_SQL_PASSWORD: ${{ secrets.DEV_SQL_PASSWORD }}
+        shell: pwsh
         run: |
-          echo "Running post-deployment health checks..."
-          # Add your health check script here
-          echo "Health checks completed"
+          Write-Host "Running post-deployment health checks..."
+          
+          # Check SQL Server connection
+          docker-compose exec -T sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT @@VERSION"
+          
+          # Check DBT connection
+          docker-compose exec -T dbt dbt debug
+          
+          Write-Host "Health checks completed"
 
       - name: Check data freshness
         continue-on-error: true
+        shell: pwsh
         run: |
-          cd dbt
-          pip install dbt-sqlserver
-          dbt source freshness --profiles-dir . --target ${{ env.TARGET }} || true
+          Write-Host "Checking data freshness..."
+          docker-compose exec -T dbt dbt source freshness --target ${{ env.TARGET }}
 
   # Deployment notification
   notify-deployment:
     name: Deployment Notification
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     needs: [deploy-dev, post-deployment-health-check]
     if: always()
     timeout-minutes: 5
@@ -192,42 +206,44 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Send deployment notification
+        shell: pwsh
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          if [ "${{ needs.deploy-dev.result }}" == "success" ]; then
-            STATUS="Success"
-            COLOR="good"
-          else
-            STATUS="Failed"
-            COLOR="danger"
-          fi
-          
-          PAYLOAD=$(cat <<EOF
-          {
-            "text": "Development Deployment $STATUS",
-            "attachments": [{
-              "color": "$COLOR",
-              "fields": [
-                {"title": "Environment", "value": "${{ env.ENVIRONMENT }}", "short": true},
-                {"title": "Status", "value": "$STATUS", "short": true},
-                {"title": "Deployed by", "value": "${{ github.actor }}", "short": true},
-                {"title": "Commit", "value": "${{ github.sha }}", "short": true},
-                {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
-                {"title": "Workflow", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false}
-              ]
-            }]
+          if ("${{ needs.deploy-dev.result }}" -eq "success") {
+            $status = "Success"
+            $color = "good"
+          } else {
+            $status = "Failed"
+            $color = "danger"
           }
-          EOF
-          )
           
-          if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            curl -X POST -H 'Content-type: application/json' \
-              --data "$PAYLOAD" \
-              "$SLACK_WEBHOOK_URL" || true
-          else
-            echo "Slack webhook not configured. Skipping notification."
-          fi
+          $payload = @{
+            text = "Development Deployment $status"
+            attachments = @(
+              @{
+                color = $color
+                fields = @(
+                  @{ title = "Environment"; value = "${{ env.ENVIRONMENT }}"; short = $true }
+                  @{ title = "Status"; value = $status; short = $true }
+                  @{ title = "Deployed by"; value = "${{ github.actor }}"; short = $true }
+                  @{ title = "Commit"; value = "${{ github.sha }}"; short = $true }
+                  @{ title = "Branch"; value = "${{ github.ref_name }}"; short = $true }
+                  @{ title = "Workflow"; value = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; short = $false }
+                )
+              }
+            )
+          } | ConvertTo-Json -Depth 10
+          
+          if ($env:SLACK_WEBHOOK_URL) {
+            try {
+              Invoke-RestMethod -Uri $env:SLACK_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+            } catch {
+              Write-Host "Failed to send Slack notification: $_"
+            }
+          } else {
+            Write-Host "Slack webhook not configured. Skipping notification."
+          }
 
       - name: Comment on PR (if applicable)
         if: github.event_name == 'pull_request'
@@ -250,4 +266,3 @@ jobs:
               repo: context.repo.repo,
               body: body
             });
-
