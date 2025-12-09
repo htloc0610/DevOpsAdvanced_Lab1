@@ -15,6 +15,7 @@ env:
   ENVIRONMENT: dev
   TARGET: dev
   PROJECT_NAME: dbt_airflow_project
+  DBT_PROFILES_DIR: /usr/app/dbt
 
 jobs:
   # Pre-deployment validation
@@ -76,14 +77,14 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Validating DBT project..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt debug
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt debug --profiles-dir ${{ env.DBT_PROFILES_DIR }}
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Check DBT dependencies
         shell: powershell
         run: |
           Write-Host "Installing DBT dependencies..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt deps
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt deps --profiles-dir ${{ env.DBT_PROFILES_DIR }}
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   # Deploy to Development
@@ -118,14 +119,14 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Installing DBT dependencies..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt deps
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt deps --profiles-dir ${{ env.DBT_PROFILES_DIR }}
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Compile DBT models
         shell: powershell
         run: |
           Write-Host "Compiling DBT models..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt compile --target ${{ env.TARGET }}
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt compile --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Run DBT transformations
@@ -133,7 +134,7 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Running DBT transformations..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt run --target ${{ env.TARGET }}
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt run --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Run data quality tests
@@ -141,7 +142,7 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Running DBT tests..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt test --target ${{ env.TARGET }}
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt test --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Check source freshness
@@ -149,14 +150,14 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Checking source freshness..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --target ${{ env.TARGET }}
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
 
       - name: Generate DBT documentation
         shell: powershell
         continue-on-error: true
         run: |
           Write-Host "Generating DBT documentation..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt docs generate --target ${{ env.TARGET }}
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt docs generate --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
 
       - name: Upload deployment artifacts
         if: always()
@@ -214,7 +215,7 @@ jobs:
           docker-compose -p ${{ env.PROJECT_NAME }} exec -T sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT @@VERSION"
           
           # Check DBT connection
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt debug
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt debug --profiles-dir ${{ env.DBT_PROFILES_DIR }}
           
           Write-Host "Health checks completed"
 
@@ -223,7 +224,7 @@ jobs:
         shell: powershell
         run: |
           Write-Host "Checking data freshness..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --target ${{ env.TARGET }}
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
 
   # Deployment notification
   notify-deployment:
