@@ -23,7 +23,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
       interval: 5s
       retries: 5
     networks:
@@ -84,7 +84,7 @@ services:
       - sqlserver
     volumes:
       - ./dbt:/usr/app/dbt
-    command: tail -f /dev/null  # Keep container running
+    command: tail -f /dev/null # Keep container running
     networks:
       - dbt_airflow_network
 
@@ -92,6 +92,7 @@ volumes:
   sqlserver_data:
   postgres_data:
 
+
 networks:
   dbt_airflow_network:
-    driver: bridge 
+    driver: bridge
