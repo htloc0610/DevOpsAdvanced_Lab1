@@ -282,6 +282,13 @@ jobs:
           
           Write-Host "Health checks completed"
 
+      - name: Install DBT dependencies
+        shell: powershell
+        run: |
+          Write-Host "Installing DBT dependencies..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt deps --profiles-dir ${{ env.DBT_PROFILES_DIR }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Check data freshness
         continue-on-error: true
         shell: powershell
