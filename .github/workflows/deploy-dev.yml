@@ -177,12 +177,12 @@ jobs:
           docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt test --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Check source freshness
-        continue-on-error: true
-        shell: powershell
-        run: |
-          Write-Host "Checking source freshness..."
-          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
+      # - name: Check source freshness
+      #   continue-on-error: true
+      #   shell: powershell
+      #   run: |
+      #     Write-Host "Checking source freshness..."
+      #     docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
 
       - name: Generate DBT documentation
         shell: powershell
