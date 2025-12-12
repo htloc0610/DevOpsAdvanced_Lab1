@@ -56,7 +56,7 @@ jobs:
                 application_name: dbt_airflow_project
                 retry_on_error: True
           "@          
-          $profileContent | Out-File -FilePath "dbt/profiles.yml" -Encoding utf8 -Force
+          $profileContent | Out-File -FilePath "./dbt/profiles.yml" -Encoding utf8 -Force
           Write-Host "profiles.yml created successfully"
 
       - name: Ensure Docker services are running
