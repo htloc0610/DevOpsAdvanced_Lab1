@@ -1,5 +1,9 @@
 # DBT and Airflow Data Pipeline Project
 
+[![CI Pipeline](https://github.com/htloc0610/DevOpsAdvanced_Lab1/workflows/CI%20Pipeline/badge.svg)](https://github.com/htloc0610/DevOpsAdvanced_Lab1/actions/workflows/ci.yml)
+[![Deploy to Development](https://github.com/htloc0610/DevOpsAdvanced_Lab1/workflows/Deploy%20to%20Development/badge.svg)](https://github.com/htloc0610/DevOpsAdvanced_Lab1/actions/workflows/deploy-dev.yml)
+[![Deploy to Production](https://github.com/htloc0610/DevOpsAdvanced_Lab1/workflows/Deploy%20to%20Production/badge.svg)](https://github.com/htloc0610/DevOpsAdvanced_Lab1/actions/workflows/deploy-prod.yml)
+
 ## Project Overview
 This project implements an automated data transformation pipeline using DBT (Data Build Tool) and Apache Airflow. The pipeline extracts data from SQL Server, transforms it using DBT models, and loads it into a target database, following modern data engineering best practices.
 
@@ -144,7 +148,7 @@ The following components from the original structure were removed as they weren'
 
 1.1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/htloc0610/DevOpsAdvanced_Lab1.git
 cd dbt_airflow_project
 ```
 
@@ -405,16 +409,121 @@ Common issues and solutions:
    - Verify task dependencies
    - Check Airflow logs
 
+## CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment automation.
+
+### Continuous Integration (CI)
+
+The CI pipeline runs on every pull request and push to main/develop branches:
+
+- **SQL Linting**: Validates SQL code quality using SQLFluff
+- **Python Linting**: Checks Python code with Flake8 and Black
+- **DBT Compilation**: Compiles all DBT models to catch syntax errors
+- **DBT Tests**: Runs all data quality tests
+- **PR Validation**: Validates PR title format, file sizes, and merge conflicts
+- **Documentation Generation**: Auto-generates DBT documentation
+
+**Workflow:** `.github/workflows/ci.yml`
+
+### Continuous Deployment (CD)
+
+#### Development Environment
+
+- **Trigger**: Automatic on merge to `develop` branch
+- **Workflow**: `.github/workflows/deploy-dev.yml`
+- **Steps**:
+  1. Pre-deployment validation
+  2. Install DBT dependencies
+  3. Run DBT transformations
+  4. Execute data quality tests
+  5. Post-deployment health checks
+  6. Send deployment notifications
+
+#### Production Environment
+
+- **Trigger**: Automatic on merge/tag to `main` branch
+- **Workflow**: `.github/workflows/deploy-prod.yml`
+- **Advanced Features**:
+  - Pre-deployment validation and backup
+  - Environment-specific target configuration
+  - Automatic rollback on test failures
+  - Post-deployment health checks
+  - Deployment notifications (Slack, GitHub)
+  - Version tagging and release creation
+
+### Rollback Capability
+
+Manual rollback workflow available for both environments:
+
+- **Workflow**: `.github/workflows/rollback.yml`
+- **Usage**: Trigger manually via GitHub Actions UI
+- **Features**:
+  - Rollback to specific commit SHA
+  - Automatic rollback to previous deployment
+  - Rollback verification and testing
+  - Notification on rollback completion
+
+### Deployment Notifications
+
+Deployments send notifications to:
+- **Slack**: Configure `SLACK_WEBHOOK_URL` secret
+- **GitHub**: PR comments and workflow summaries
+- **Email**: Configure in workflow environment settings
+
+### Environment Configuration
+
+Secrets required in GitHub repository:
+
+**Development:**
+- `DEV_SQL_SERVER`
+- `DEV_SQL_USER`
+- `DEV_SQL_PASSWORD`
+
+**Production:**
+- `PROD_SQL_SERVER`
+- `PROD_SQL_USER`
+- `PROD_SQL_PASSWORD`
+
+**Shared:**
+- `SLACK_WEBHOOK_URL` (optional)
+
+### Deployment Status Badges
+
+Add the following badges to your README (update with your repository):
+
+```markdown
+[![CI Pipeline](https://github.com/htloc0610/DevOpsAdvanced_Lab1/workflows/CI%20Pipeline/badge.svg)](https://github.com/htloc0610/DevOpsAdvanced_Lab1/actions/workflows/ci.yml)
+[![Deploy to Development](https://github.com/htloc0610/DevOpsAdvanced_Lab1/workflows/Deploy%20to%20Development/badge.svg)](https://github.com/htloc0610/DevOpsAdvanced_Lab1/actions/workflows/deploy-dev.yml)
+[![Deploy to Production](https://github.com/htloc0610/DevOpsAdvanced_Lab1/workflows/Deploy%20to%20Production/badge.svg)](https://github.com/htloc0610/DevOpsAdvanced_Lab1/actions/workflows/deploy-prod.yml)
+```
+
+For more details, see [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md).
+
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch following naming convention: `feature/description` or `fix/description`
 3. Make your changes
-4. Submit a pull request
+4. Ensure CI checks pass
+5. Submit a pull request with conventional commit message format:
+   - `feat: add new feature`
+   - `fix: correct bug`
+   - `docs: update documentation`
+   - `test: add tests`
+
+### Pull Request Requirements
+
+- PR title must follow [Conventional Commits](https://www.conventionalcommits.org/) format
+- All CI checks must pass
+- Code must be properly formatted (Black, Flake8)
+- DBT models must compile and pass tests
+- No merge conflicts
 
 ## Support
 
 For additional support:
 - Check the project issues
+- Review [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md) for deployment procedures
 - Contact the development team
 - Refer to DBT and Airflow documentation 

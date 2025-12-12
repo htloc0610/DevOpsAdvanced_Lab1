@@ -1,0 +1,301 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (use with caution)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  ENVIRONMENT: dev
+  TARGET: dev
+  PROJECT_NAME: dbt_airflow_project
+  DBT_PROFILES_DIR: /usr/app/dbt
+
+jobs:
+  # Pre-deployment validation
+  pre-deployment-check:
+    name: Pre-deployment Validation
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create DBT profile
+        shell: powershell
+        run: |
+          Write-Host "Creating DBT profiles.yml..."
+          $profileContent = @"
+          dbt_airflow_project:
+            target: dev
+            outputs:
+              dev:
+                type: sqlserver
+                driver: "ODBC Driver 17 for SQL Server"
+                server: host.docker.internal
+                port: 1433
+                database: AdventureWorks2014
+                schema: dbo
+                user: imrandbtnew
+                password: "Imran@12345"
+                windows_login: False
+                encrypt: False
+                trust_cert: True
+                threads: 4
+                timeout_seconds: 300
+                retries: 3
+                authentication: sql
+                keepalives_idle: 0
+                application_name: dbt_airflow_project
+                retry_on_error: True
+          "@          
+          $profileContent | Out-File -FilePath "dbt/profiles.yml" -Encoding utf8 -Force
+          Write-Host "profiles.yml created successfully"
+
+      - name: Ensure Docker services are running
+        shell: powershell
+        run: |
+          Write-Host "Checking Docker services status..."
+          docker-compose -p ${{ env.PROJECT_NAME }} ps
+          
+          # Ensure containers are running
+          $containers = docker-compose -p ${{ env.PROJECT_NAME }} ps -q
+          if (-not $containers) {
+            Write-Host "Starting Docker services..."
+            docker-compose -p ${{ env.PROJECT_NAME }} up -d
+            Start-Sleep -Seconds 60
+          }
+
+      - name: Validate DBT project
+        shell: powershell
+        run: |
+          Write-Host "Validating DBT project..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt debug --profiles-dir ${{ env.DBT_PROFILES_DIR }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Check DBT dependencies
+        shell: powershell
+        run: |
+          Write-Host "Installing DBT dependencies..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt deps --profiles-dir ${{ env.DBT_PROFILES_DIR }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+  # Deploy to Development
+  deploy-dev:
+    name: Deploy to Development Environment
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 30
+    needs: pre-deployment-check
+    environment:
+      name: development
+      url: https://dev.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Ensure Docker services are running
+        shell: powershell
+        run: |
+          Write-Host "Checking Docker services status..."
+          docker-compose -p ${{ env.PROJECT_NAME }} ps
+          
+          # Ensure containers are running
+          $containers = docker-compose -p ${{ env.PROJECT_NAME }} ps -q
+          if (-not $containers) {
+            Write-Host "Starting Docker services..."
+            docker-compose -p ${{ env.PROJECT_NAME }} up -d
+            Start-Sleep -Seconds 60
+          }
+
+      - name: Install DBT dependencies
+        shell: powershell
+        run: |
+          Write-Host "Installing DBT dependencies..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt deps --profiles-dir ${{ env.DBT_PROFILES_DIR }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Compile DBT models
+        shell: powershell
+        run: |
+          Write-Host "Compiling DBT models..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt compile --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Run DBT transformations
+        id: dbt_run
+        shell: powershell
+        run: |
+          Write-Host "Running DBT transformations..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt run --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Run data quality tests
+        if: ${{ !inputs.skip_tests }}
+        shell: powershell
+        run: |
+          Write-Host "Running DBT tests..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt test --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Check source freshness
+        continue-on-error: true
+        shell: powershell
+        run: |
+          Write-Host "Checking source freshness..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
+
+      - name: Generate DBT documentation
+        shell: powershell
+        continue-on-error: true
+        run: |
+          Write-Host "Generating DBT documentation..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt docs generate --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
+
+      - name: Upload deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-deployment-artifacts
+          path: |
+            dbt/target/
+            dbt/logs/
+          retention-days: 30
+
+      - name: Create deployment summary
+        if: always()
+        shell: powershell
+        run: |
+          $summary = @"
+          ## Deployment to Development Environment
+          
+          **Status:** ${{ job.status }}
+          **Environment:** ${{ env.ENVIRONMENT }}
+          **Target:** ${{ env.TARGET }}
+          **Deployed by:** ${{ github.actor }}
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          
+          "@
+          
+          if ("${{ job.status }}" -eq "success") {
+            $summary += "**Deployment Successful**"
+          } else {
+            $summary += "**Deployment Failed**"
+          }
+          
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+  # Post-deployment health checks
+  post-deployment-health-check:
+    name: Post-deployment Health Checks
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 15
+    needs: deploy-dev
+    if: success()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run health checks
+        continue-on-error: true
+        shell: powershell
+        run: |
+          Write-Host "Running post-deployment health checks..."
+          
+          # Check SQL Server connection
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT @@VERSION"
+          
+          # Check DBT connection
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt debug --profiles-dir ${{ env.DBT_PROFILES_DIR }}
+          
+          Write-Host "Health checks completed"
+
+      - name: Check data freshness
+        continue-on-error: true
+        shell: powershell
+        run: |
+          Write-Host "Checking data freshness..."
+          docker-compose -p ${{ env.PROJECT_NAME }} exec -T dbt dbt source freshness --profiles-dir ${{ env.DBT_PROFILES_DIR }} --target ${{ env.TARGET }}
+
+  # Deployment notification
+  notify-deployment:
+    name: Deployment Notification
+    runs-on: [self-hosted, Windows, X64]
+    needs: [deploy-dev, post-deployment-health-check]
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send deployment notification
+        shell: powershell
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if ("${{ needs.deploy-dev.result }}" -eq "success") {
+            $status = "Success"
+            $color = "good"
+          } else {
+            $status = "Failed"
+            $color = "danger"
+          }
+          
+          $payload = @{
+            text = "Development Deployment $status"
+            attachments = @(
+              @{
+                color = $color
+                fields = @(
+                  @{ title = "Environment"; value = "${{ env.ENVIRONMENT }}"; short = $true }
+                  @{ title = "Status"; value = $status; short = $true }
+                  @{ title = "Deployed by"; value = "${{ github.actor }}"; short = $true }
+                  @{ title = "Commit"; value = "${{ github.sha }}"; short = $true }
+                  @{ title = "Branch"; value = "${{ github.ref_name }}"; short = $true }
+                  @{ title = "Workflow"; value = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; short = $false }
+                )
+              }
+            )
+          } | ConvertTo-Json -Depth 10
+          
+          if ($env:SLACK_WEBHOOK_URL) {
+            try {
+              Invoke-RestMethod -Uri $env:SLACK_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json"
+            } catch {
+              Write-Host "Failed to send Slack notification: $_"
+            }
+          } else {
+            Write-Host "Slack webhook not configured. Skipping notification."
+          }
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ needs.deploy-dev.result }}' === 'success' ? 'Success' : 'Failed';
+            const body = `## Development Deployment ${status}
+            
+            **Environment:** ${{ env.ENVIRONMENT }}
+            **Status:** ${{ needs.deploy-dev.result }}
+            **Deployed by:** ${{ github.actor }}
+            **Commit:** ${{ github.sha }}
+            
+            [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
